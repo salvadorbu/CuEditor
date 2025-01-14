@@ -4,7 +4,6 @@
 FileBuffer::FileBuffer()
     : m_hFile(INVALID_HANDLE_VALUE)
     , m_hMapping(NULL)
-    , m_fileData(nullptr)
     , m_fileSize(0)
     , m_isLarge(false)
 {
@@ -40,16 +39,23 @@ bool FileBuffer::load(const QString& filePath)
         return false;
     }
     m_fileSize = fileSize.QuadPart;
-    m_isLarge = m_fileSize > CHUNK_SIZE; // Chunk size is "large file" threshold
+    m_isLarge = m_fileSize > CHUNK_SIZE;
 
-    bool success = m_isLarge ? loadLargeFile() : loadSmallFile();
-
-    if (!success) {
-        unload();
-        return false;
+    if (!m_isLarge) {
+        return loadSmallFile();
     }
 
-    return true;
+    // For large files, just create the file mapping object
+    m_hMapping = CreateFileMappingW(
+        m_hFile,
+        NULL,
+        PAGE_READONLY,
+        0,
+        0,
+        NULL
+    );
+
+    return m_hMapping != NULL;
 }
 
 bool FileBuffer::loadSmallFile()
@@ -68,20 +74,6 @@ bool FileBuffer::loadSmallFile()
     return true;
 }
 
-bool FileBuffer::loadLargeFile()
-{
-    m_hMapping = CreateFileMappingW(
-        m_hFile,
-        NULL,
-        PAGE_READONLY,
-        0,
-        0,
-        NULL
-    );
-
-    return m_hMapping != NULL;
-}
-
 QString FileBuffer::readChunk(size_t offset, size_t size)
 {
     if (offset >= m_fileSize) {
@@ -93,13 +85,8 @@ QString FileBuffer::readChunk(size_t offset, size_t size)
         return QString();
     }
 
-    // Only do lazy loading with large files
     if (!m_isLarge) {
         return QString::fromUtf8(m_data.data() + offset, size);
-    }
-
-    if (!m_hMapping) {
-        return QString();
     }
 
     DWORD offsetHigh = static_cast<DWORD>((offset >> 32) & 0xFFFFFFFF);
@@ -124,6 +111,8 @@ QString FileBuffer::readChunk(size_t offset, size_t size)
 
 void FileBuffer::unload()
 {
+    m_data.clear();
+
     if (m_hMapping) {
         CloseHandle(m_hMapping);
         m_hMapping = NULL;
@@ -134,7 +123,6 @@ void FileBuffer::unload()
         m_hFile = INVALID_HANDLE_VALUE;
     }
 
-    m_data.clear();
     m_fileSize = 0;
     m_isLarge = false;
 }

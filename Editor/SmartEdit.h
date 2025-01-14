@@ -1,27 +1,17 @@
 #pragma once
-#include <qplaintextedit.h>
-#include <memory>
+#include <QPlainTextEdit>
 #include "FileBuffer.h"
+#include <memory>
 
 class SmartEdit : public QPlainTextEdit {
-	Q_OBJECT
+    Q_OBJECT
 
 public:
-	SmartEdit(QWidget* parent = nullptr);
-	void setBuffer(std::shared_ptr<FileBuffer> buffer);
+    explicit SmartEdit(QWidget* parent = nullptr);
 
-protected:
-	void resizeEvent(QResizeEvent* event) override;
-	void scrollContentsBy(int dx, int dy) override;
-
-private slots:
-	void updateScrollbar();
+    void setBuffer(std::shared_ptr<FileBuffer> buffer);
+    std::shared_ptr<FileBuffer> buffer() const;
 
 private:
-	void loadVisibleContent();
-	std::shared_ptr<FileBuffer> m_buffer;
-	bool m_updatingContent;
-	QString m_currentContent;
-	bool m_pendingUpdate;
-	bool m_isLazyMode;
+    std::shared_ptr<FileBuffer> m_buffer;
 };
